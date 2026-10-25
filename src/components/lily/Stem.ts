@@ -105,11 +105,8 @@ export class Stem {
         }
 
         const u = this.scale;
-        // The control point is biased toward the flower head. Sitting it at the
-        // vertical midpoint pulled the stems inward into a pinched waist, which
-        // read as a wine glass rather than a hand-tied bouquet.
         const controlX = lerp(this.rootX, this.flowerX, 0.42) + (this.flowerX - this.rootX) * this.arcStrength;
-        const controlY = lerp(this.rootY, this.flowerY, 0.72);
+        const controlY = lerp(this.rootY, this.flowerY, 0.5);
 
         const pointAt = (amount: number) => {
             const mt = 1 - amount;

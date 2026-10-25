@@ -90,12 +90,12 @@ end state immediately, with no growth animation, drifting hearts, or meteors.
 
 ## Responsive layout
 
-`measure()` in `LilyBouquet.tsx` derives the whole composition from the
-viewport: the dome is sized from the available stage so it stays roughly round
-in both orientations, the tie point sits just beneath the lowest blooms, and
-the kraft cone hangs from it at a ~1:1.6 width-to-drop ratio. The ASCII cell
-size scales with the renderer's resolution so glyphs stay legible on
-high-DPI phones.
+`measure()` in `LilyBouquet.tsx` derives the bouquet geometry from the
+viewport: the dome is scaled inside a bounded box so portrait screens keep a
+compact, round bouquet rather than a stretched column, and the kraft cone
+hangs from the tie point below it. The ASCII cell size scales with the
+renderer's resolution, so glyphs stay the same physical size on every screen
+instead of shrinking on high-DPI phones.
 
 ## Deploying
 

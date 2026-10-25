@@ -159,8 +159,8 @@ export default function LilyBouquet() {
       // Keep the glyph grid at a constant physical size across DPRs.
       // Invoked after `measure` is defined (see buildBouquet).
       const applyCellSize = () => {
-        const m = measure();
-        asciiFilter.cellSize = asciiCellSize(renderRatio(pixi.renderer.resolution), m.portrait);
+        const portrait = pixi.screen.height > pixi.screen.width;
+        asciiFilter.cellSize = asciiCellSize(renderRatio(pixi.renderer.resolution), portrait);
       };
 
       world.addChild(starLayer);
@@ -273,100 +273,30 @@ export default function LilyBouquet() {
       const measure = () => {
         const w = pixi.screen.width;
         const h = pixi.screen.height;
-
-        // Portrait phones get a narrower, wider-than-tall dome so the bouquet
-        // reads as a bouquet instead of a tall spire. The dome is sized from
-        // the *width* on portrait and from the *height* on landscape.
-        const portrait = h > w;
-        const aspect = w / h;
-
-        // Unit scale for the bloom art. On phones the old floor of 0.5 made
-        // every flower tiny; these floors keep them legible on small screens.
-        const u = clamp(
-          portrait
-            ? clamp(w / 560, 0.62, 1.0)
-            : Math.min(w / 860, h / 720),
-          0.62,
-          1.15,
-        );
-
-        // The bouquet is sized as one object that fits between the title and
-        // the footer caption. The dome takes the upper portion, the kraft cone
-        // hangs beneath it, and the whole thing is centred — instead of the
-        // old layout where a long bare stem joined a distant wrap and the
-        // whole thing looked like a wine glass.
-        const titleBand = h * (portrait ? 0.2 : 0.18);
-        const footerBand = h * (portrait ? 0.09 : 0.08);
-        const stageTop = titleBand;
-        const stageBottom = h - footerBand;
-        const stageHeight = stageBottom - stageTop;
-
-        // The cone takes roughly a quarter of the stage; the dome the rest.
-        const wrapDrop = Math.min(stageHeight * 0.26, h * 0.21);
-
-        // Dome footprint. The dome is always roughly as wide as it is tall so
-        // the bloom mass stays round; sizing it from the width in both
-        // orientations is what stopped the desktop version from squashing
-        // into a pancake and the phone version from becoming a tall spire.
-        const domeHeight = Math.min(stageHeight * (portrait ? 0.5 : 0.6), h * 0.5);
-        const domeWidth = Math.min(
-          portrait ? w * 0.94 : w * 0.82,
-          domeHeight * (portrait ? 1.35 : 1.5),
-        );
-
-        // The bloom layout is authored as a narrow fan (good for a wide
-        // desktop dome). On portrait we spread it sideways and compress it
-        // vertically so the same arrangement reads as a round bouquet.
-        const spreadX = portrait ? 1.42 : 1;
-        const spreadY = portrait ? 0.8 : 1;
-
-        // The dome sits just below the title so the cone has room to hang
-        // beneath it without a big empty gap in between.
-        const domeCenterY = stageTop + stageHeight * (portrait ? 0.3 : 0.34);
-
-        // The tie point sits just beneath the lowest blooms, so the cone
-        // begins where the flowers end and nothing dangles in between.
-        const lowestBloom = domeCenterY + (0.612 - 0.4) * domeHeight * spreadY;
-        const tieY = Math.min(lowestBloom + domeHeight * 0.1, stageBottom - wrapDrop);
+        const u = clamp(Math.min(w / 860, h / 720), 0.5, 1.15);
 
         return {
           w,
           h,
           u,
-          portrait,
-          aspect,
           tieX: w * 0.5,
-          tieY,
-          domeWidth,
-          domeCenterY,
-          domeHeight,
-          spreadX,
-          spreadY,
-          wrapDrop,
+          tieY: h * 0.82,
+          domeWidth: Math.min(w * 0.84, h * 1.1),
+          // The dome scales inside a bounded box so portrait screens keep a
+          // compact, round bouquet instead of a stretched column.
+          domeCenterY: h * 0.4,
+          domeHeight: Math.min(h * 0.56, w * 1.15),
         };
       };
 
-      /**
-       * Wrap layout. The kraft cone hangs from the tie and tapers down to a
-       * point, so its width-to-drop ratio stays around 1:1.6 — a real cone
-       * rather than a long spike.
-       */
-      const wrapLayout = (m: ReturnType<typeof measure>) => ({
-        tieX: m.tieX,
-        tieY: m.tieY,
-        scale: m.u,
-        bottomY: m.tieY + m.wrapDrop,
-        maxWidth: Math.min(m.w * 0.3, m.domeWidth * 0.3, m.wrapDrop * 0.62),
-      });
-
       const flowerPos = (config: FlowerConfig, m: ReturnType<typeof measure>) => ({
-        x: m.tieX + (config.x - 0.5) * m.domeWidth * m.spreadX,
-        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight * m.spreadY,
+        x: m.tieX + (config.x - 0.5) * m.domeWidth,
+        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight,
       });
 
       const greeneryPos = (config: GreeneryConfig, m: ReturnType<typeof measure>) => ({
-        x: m.tieX + (config.x - 0.5) * m.domeWidth * m.spreadX,
-        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight * m.spreadY,
+        x: m.tieX + (config.x - 0.5) * m.domeWidth,
+        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight,
       });
 
       const buildBouquet = () => {
@@ -427,7 +357,13 @@ export default function LilyBouquet() {
           bouquet.addChild(lily.container);
         });
 
-        wrap.setLayout(wrapLayout(m), true);
+        wrap.setLayout({
+          tieX: m.tieX,
+          tieY: m.tieY,
+          scale: m.u,
+          bottomY: m.h * 1.05,
+          maxWidth: m.w * 0.2,
+        }, true);
       };
 
       const restart = () => {
@@ -496,7 +432,13 @@ export default function LilyBouquet() {
           lily.container.position.set(pos.x, pos.y);
         });
 
-        wrap.setLayout(wrapLayout(m));
+        wrap.setLayout({
+          tieX: m.tieX,
+          tieY: m.tieY,
+          scale: m.u,
+          bottomY: m.h * 1.05,
+          maxWidth: m.w * 0.2,
+        });
       };
 
       const update = (ticker: { deltaMS: number }) => {
