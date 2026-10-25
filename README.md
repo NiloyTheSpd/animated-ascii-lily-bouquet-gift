@@ -54,6 +54,8 @@ src/
     layout.tsx          # Metadata, fonts, Toaster
     page.tsx            # Renders the bouquet stage
     globals.css         # Tailwind theme + ambient animations
+    fonts/
+      HughIsLife.ttf    # "Hugh is Life" script face (see Fonts)
   components/
     BouquetStage.tsx    # Client-only wrapper (PixiJS needs the DOM)
     LilyBouquet.tsx     # Scene graph, bloom choreography, effects
@@ -69,10 +71,31 @@ public/
   manifest.webmanifest  # PWA manifest
 ```
 
+## Fonts
+
+The title uses **Hugh is Life**, a handwritten script whose `I`, `J` and `M`
+are drawn as little hearts — which is why the greeting reads "I love you" with
+a heart for the `I`. It is loaded through `next/font/local` from
+`src/app/fonts/HughIsLife.ttf` and exposed to CSS as the `--font-love`
+variable (see `.font-love` in `globals.css`).
+
+> The typeface is licensed for **personal use only**. The font file is kept in
+> the repository so the greeting renders correctly; remove it and swap
+> `--font-love` for a licensed face if you publish this anywhere public.
+
 ## Accessibility
 
 The scene respects `prefers-reduced-motion`: the bouquet renders in its settled
 end state immediately, with no growth animation, drifting hearts, or meteors.
+
+## Responsive layout
+
+`measure()` in `LilyBouquet.tsx` derives the whole composition from the
+viewport: the dome is sized from the available stage so it stays roughly round
+in both orientations, the tie point sits just beneath the lowest blooms, and
+the kraft cone hangs from it at a ~1:1.6 width-to-drop ratio. The ASCII cell
+size scales with the renderer's resolution so glyphs stay legible on
+high-DPI phones.
 
 ## Deploying
 

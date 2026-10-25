@@ -62,9 +62,13 @@ export class Wrap {
 
     private draw() {
         const u = this.layout.scale;
-        const topHalf = Math.min(this.layout.maxWidth, 86 * u);
-        const bottomHalf = topHalf * 0.3;
         const bottomDrop = this.layout.bottomY - this.layout.tieY;
+
+        // The paper's half-width is capped so the cone keeps a believable
+        // ~1:1.6 width-to-drop ratio instead of stretching into a spike.
+        const ratioCap = bottomDrop * 0.62;
+        const topHalf = Math.min(this.layout.maxWidth, ratioCap, 150 * u);
+        const bottomHalf = topHalf * 0.3;
 
         this.paper.clear();
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -13,10 +14,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({
+// "Hugh is Life" — a handwritten script with heart glyphs for I / J / M.
+// Licensed for personal use only.
+const hughIsLife = localFont({
+  src: "./fonts/HughIsLife.ttf",
   variable: "--font-love",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  weight: "400",
 });
 
 const SITE_URL = "https://animated-ascii-lily-bouquet-gift.vercel.app";
@@ -80,7 +84,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${hughIsLife.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster />

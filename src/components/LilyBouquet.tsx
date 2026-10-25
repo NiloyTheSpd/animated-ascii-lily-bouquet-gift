@@ -74,6 +74,28 @@ const LILY_DELAY = (config: FlowerConfig) => 0.18 + (BLOOM_RANK.get(config) ?? 0
 const ASCII_CELL_SIZE = 4;
 const COLOR_BOOST = 1.25;
 
+/**
+ * The shader compares `uCellSize` against the render target's *device* pixels,
+ * so a raw CSS-px constant would shrink the glyphs on high-DPR phones
+ * (a 4px cell becomes 1.33 CSS px at DPR 3). Scaling by the pixel ratio keeps
+ * every glyph the same physical size on every screen.
+ */
+function asciiCellSize(dpr: number, portrait: boolean) {
+  const base = ASCII_CELL_SIZE * dpr;
+  // Phones get slightly larger cells: at small physical sizes the finer
+  // desktop grid turns the bloom into visual noise.
+  return portrait ? base * 1.15 : base;
+}
+
+/**
+ * The renderer's effective pixel ratio. Pixi caps `resolution` at 2, so on a
+ * 3x phone the canvas backing store is 2x CSS pixels — not 3x. The ASCII
+ * cell must be scaled by this value to stay physically consistent.
+ */
+function renderRatio(resolution: number) {
+  return resolution || 1;
+}
+
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -133,6 +155,13 @@ export default function LilyBouquet() {
       const sparkleLayer = new Graphics();
       const asciiFilter = new AsciiFilter(ASCII_CELL_SIZE, COLOR_BOOST);
       asciiFilter.resolutionUniform = [pixi.screen.width, pixi.screen.height];
+
+      // Keep the glyph grid at a constant physical size across DPRs.
+      // Invoked after `measure` is defined (see buildBouquet).
+      const applyCellSize = () => {
+        const m = measure();
+        asciiFilter.cellSize = asciiCellSize(renderRatio(pixi.renderer.resolution), m.portrait);
+      };
 
       world.addChild(starLayer);
       world.addChild(constellationLayer);
@@ -244,29 +273,100 @@ export default function LilyBouquet() {
       const measure = () => {
         const w = pixi.screen.width;
         const h = pixi.screen.height;
-        const u = clamp(Math.min(w / 860, h / 720), 0.5, 1.15);
+
+        // Portrait phones get a narrower, wider-than-tall dome so the bouquet
+        // reads as a bouquet instead of a tall spire. The dome is sized from
+        // the *width* on portrait and from the *height* on landscape.
+        const portrait = h > w;
+        const aspect = w / h;
+
+        // Unit scale for the bloom art. On phones the old floor of 0.5 made
+        // every flower tiny; these floors keep them legible on small screens.
+        const u = clamp(
+          portrait
+            ? clamp(w / 560, 0.62, 1.0)
+            : Math.min(w / 860, h / 720),
+          0.62,
+          1.15,
+        );
+
+        // The bouquet is sized as one object that fits between the title and
+        // the footer caption. The dome takes the upper portion, the kraft cone
+        // hangs beneath it, and the whole thing is centred — instead of the
+        // old layout where a long bare stem joined a distant wrap and the
+        // whole thing looked like a wine glass.
+        const titleBand = h * (portrait ? 0.2 : 0.18);
+        const footerBand = h * (portrait ? 0.09 : 0.08);
+        const stageTop = titleBand;
+        const stageBottom = h - footerBand;
+        const stageHeight = stageBottom - stageTop;
+
+        // The cone takes roughly a quarter of the stage; the dome the rest.
+        const wrapDrop = Math.min(stageHeight * 0.26, h * 0.21);
+
+        // Dome footprint. The dome is always roughly as wide as it is tall so
+        // the bloom mass stays round; sizing it from the width in both
+        // orientations is what stopped the desktop version from squashing
+        // into a pancake and the phone version from becoming a tall spire.
+        const domeHeight = Math.min(stageHeight * (portrait ? 0.5 : 0.6), h * 0.5);
+        const domeWidth = Math.min(
+          portrait ? w * 0.94 : w * 0.82,
+          domeHeight * (portrait ? 1.35 : 1.5),
+        );
+
+        // The bloom layout is authored as a narrow fan (good for a wide
+        // desktop dome). On portrait we spread it sideways and compress it
+        // vertically so the same arrangement reads as a round bouquet.
+        const spreadX = portrait ? 1.42 : 1;
+        const spreadY = portrait ? 0.8 : 1;
+
+        // The dome sits just below the title so the cone has room to hang
+        // beneath it without a big empty gap in between.
+        const domeCenterY = stageTop + stageHeight * (portrait ? 0.3 : 0.34);
+
+        // The tie point sits just beneath the lowest blooms, so the cone
+        // begins where the flowers end and nothing dangles in between.
+        const lowestBloom = domeCenterY + (0.612 - 0.4) * domeHeight * spreadY;
+        const tieY = Math.min(lowestBloom + domeHeight * 0.1, stageBottom - wrapDrop);
+
         return {
           w,
           h,
           u,
+          portrait,
+          aspect,
           tieX: w * 0.5,
-          tieY: h * 0.82,
-          domeWidth: Math.min(w * 0.84, h * 1.1),
-          // The dome scales inside a bounded box so portrait screens keep a
-          // compact, round bouquet instead of a stretched column.
-          domeCenterY: h * 0.4,
-          domeHeight: Math.min(h * 0.56, w * 1.15),
+          tieY,
+          domeWidth,
+          domeCenterY,
+          domeHeight,
+          spreadX,
+          spreadY,
+          wrapDrop,
         };
       };
 
+      /**
+       * Wrap layout. The kraft cone hangs from the tie and tapers down to a
+       * point, so its width-to-drop ratio stays around 1:1.6 — a real cone
+       * rather than a long spike.
+       */
+      const wrapLayout = (m: ReturnType<typeof measure>) => ({
+        tieX: m.tieX,
+        tieY: m.tieY,
+        scale: m.u,
+        bottomY: m.tieY + m.wrapDrop,
+        maxWidth: Math.min(m.w * 0.3, m.domeWidth * 0.3, m.wrapDrop * 0.62),
+      });
+
       const flowerPos = (config: FlowerConfig, m: ReturnType<typeof measure>) => ({
-        x: m.tieX + (config.x - 0.5) * m.domeWidth,
-        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight,
+        x: m.tieX + (config.x - 0.5) * m.domeWidth * m.spreadX,
+        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight * m.spreadY,
       });
 
       const greeneryPos = (config: GreeneryConfig, m: ReturnType<typeof measure>) => ({
-        x: m.tieX + (config.x - 0.5) * m.domeWidth,
-        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight,
+        x: m.tieX + (config.x - 0.5) * m.domeWidth * m.spreadX,
+        y: m.domeCenterY + (config.y - 0.4) * m.domeHeight * m.spreadY,
       });
 
       const buildBouquet = () => {
@@ -281,6 +381,7 @@ export default function LilyBouquet() {
         bouquet.addChild(wrap.container);
 
         const m = measure();
+        applyCellSize();
 
         // Greens first (furthest back), then flower stems, then blooms, then wrap
         GREENERY.forEach((config) => {
@@ -326,13 +427,7 @@ export default function LilyBouquet() {
           bouquet.addChild(lily.container);
         });
 
-        wrap.setLayout({
-          tieX: m.tieX,
-          tieY: m.tieY,
-          scale: m.u,
-          bottomY: m.h * 1.05,
-          maxWidth: m.w * 0.2,
-        }, true);
+        wrap.setLayout(wrapLayout(m), true);
       };
 
       const restart = () => {
@@ -379,6 +474,9 @@ export default function LilyBouquet() {
         asciiFilter.resolutionUniform = [pixi.screen.width, pixi.screen.height];
 
         const m = measure();
+        // Orientation can flip between portrait and landscape, which changes
+        // the cell size and the dome shape.
+        applyCellSize();
 
         greenery.forEach((stem, index) => {
           const config = GREENERY[index];
@@ -398,13 +496,7 @@ export default function LilyBouquet() {
           lily.container.position.set(pos.x, pos.y);
         });
 
-        wrap.setLayout({
-          tieX: m.tieX,
-          tieY: m.tieY,
-          scale: m.u,
-          bottomY: m.h * 1.05,
-          maxWidth: m.w * 0.2,
-        });
+        wrap.setLayout(wrapLayout(m));
       };
 
       const update = (ticker: { deltaMS: number }) => {
@@ -615,12 +707,12 @@ export default function LilyBouquet() {
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_54%,rgba(0,0,0,0.5)_100%)]" />
 
-      <div className="love-rise pointer-events-none absolute inset-x-0 top-[5%] z-10 flex flex-col items-center gap-1 px-4 text-center sm:gap-2 sm:top-[6%]">
-        <div className="love-breathe flex flex-col items-center gap-1 sm:gap-2">
-          <h1 className="font-love text-xl uppercase tracking-[0.4em] text-white/95 pl-2 [text-shadow:0_0_26px_rgba(255,150,180,0.4),0_2px_16px_rgba(0,0,0,0.9)] sm:text-3xl sm:pl-3">
+      <div className="love-rise pointer-events-none absolute inset-x-0 top-[4%] z-10 flex flex-col items-center gap-0.5 px-3 text-center sm:gap-1 sm:top-[6%] sm:px-6">
+        <div className="love-breathe flex max-w-full flex-col items-center gap-1 sm:gap-2">
+          <h1 className="font-love text-[26px] leading-[1.15] tracking-[0.02em] text-white/95 [text-shadow:0_0_26px_rgba(255,150,180,0.45),0_2px_16px_rgba(0,0,0,0.9)] sm:text-[42px]">
             I love you
           </h1>
-          <p className="font-love text-2xl uppercase tracking-[0.3em] text-rose-200 pl-2 [text-shadow:0_0_34px_rgba(255,120,160,0.55),0_2px_18px_rgba(0,0,0,0.9)] sm:text-4xl sm:pl-3">
+          <p className="font-love text-[30px] leading-[1.2] tracking-[0.01em] text-rose-200 [text-shadow:0_0_34px_rgba(255,120,160,0.6),0_2px_18px_rgba(0,0,0,0.9)] sm:text-[52px]">
             Bushra&nbsp;my&nbsp;jaan
           </p>
         </div>
@@ -633,8 +725,10 @@ export default function LilyBouquet() {
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 text-center">
-        <p className="font-love text-[10px] uppercase tracking-[0.34em] text-white/22">tap the bouquet to make it bloom again</p>
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4 text-center sm:bottom-4">
+        <p className="font-mono text-[9px] uppercase leading-relaxed tracking-[0.18em] text-white/25 sm:text-[10px] sm:tracking-[0.34em]">
+          tap the bouquet to make it bloom again
+        </p>
       </div>
     </div>
   );

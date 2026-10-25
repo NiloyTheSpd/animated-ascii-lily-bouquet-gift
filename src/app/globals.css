@@ -123,7 +123,7 @@
 
 /* ---- Love message ---- */
 .font-love {
-  font-family: var(--font-love), Georgia, 'Times New Roman', serif;
+  font-family: var(--font-love), 'Brush Script MT', 'Segoe Script', cursive;
 }
 
 @keyframes love-rise {
