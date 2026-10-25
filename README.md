@@ -120,8 +120,10 @@ same physical size on every screen instead of shrinking on high-DPI phones.
 
 ## Deploying
 
-The project is configured for Vercel. Connect the GitHub repository in the
-Vercel dashboard to get automatic deployments on every push.
+Live at **<https://lily4bushra.vercel.app>**.
+
+The project is configured for Vercel and connected to the GitHub repository,
+so every push to `main` deploys automatically.
 
 ## Credits
 

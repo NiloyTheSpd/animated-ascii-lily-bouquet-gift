@@ -23,7 +23,7 @@ const hughIsLife = localFont({
   weight: "400",
 });
 
-const SITE_URL = "https://animated-ascii-lily-bouquet-gift.vercel.app";
+const SITE_URL = "https://lily4bushra.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
