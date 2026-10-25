@@ -91,11 +91,32 @@ end state immediately, with no growth animation, drifting hearts, or meteors.
 ## Responsive layout
 
 `measure()` in `LilyBouquet.tsx` derives the bouquet geometry from the
-viewport: the dome is scaled inside a bounded box so portrait screens keep a
-compact, round bouquet rather than a stretched column, and the kraft cone
-hangs from the tie point below it. The ASCII cell size scales with the
-renderer's resolution, so glyphs stay the same physical size on every screen
-instead of shrinking on high-DPI phones.
+viewport, and the two orientations are handled separately.
+
+**Landscape** is the original layout, unchanged: the dome is scaled inside a
+bounded box and the kraft cone hangs from the tie point below it.
+
+**Portrait** treats the bouquet as one rigid block — dome, stems and kraft
+cone — and shrinks it by a single factor, so a phone shows the *same picture*
+as a desktop, just smaller. The reference is the 1440×900 desktop layout,
+measured off the real render (dome 990×504, dome centre y 360, tie y 738,
+cone bottom y 898, greenery spanning x 0.27–0.73). Nothing is
+re-proportioned for the phone:
+
+- the dome keeps the desktop's 1.964 aspect ratio,
+- the tie stays at 82% of the screen height, and the kraft cone is cut off by
+  the bottom edge exactly as it is on the desktop,
+- the cone's radius comes from the same `86 * u` formula the desktop uses, so
+  it tapers identically,
+- flower size follows the same uniform scale, so the blooms keep their
+  proportion to the bouquet.
+
+The greenery fans wider than the blooms do, so it is what sets the width
+limit — the bouquet is scaled to keep it clear of the screen edges, and
+capped so the topmost bloom always clears the title.
+
+The ASCII cell size scales with the renderer's resolution, so glyphs stay the
+same physical size on every screen instead of shrinking on high-DPI phones.
 
 ## Deploying
 

@@ -269,10 +269,99 @@ export default function LilyBouquet() {
 
       bouquet.addChild(wrap.container);
 
-      /** Geometry of the bouquet for the current screen size. */
+      /**
+       * Geometry of the bouquet for the current screen size.
+       *
+       * Landscape keeps the original layout untouched. On portrait phones the
+       * very same layout is used, but scaled down uniformly: the desktop
+       * bouquet is a *wide* dome (aspect ~1.96) with the stems and kraft cone
+       * beneath it, and re-deriving those numbers from a phone's width and
+       * height separately produced a tall, narrow spire instead.
+       *
+       * So portrait works from a 1440x900 reference: every measurement is
+       * expressed as a ratio of that reference and multiplied by one uniform
+       * scale factor. The result is the desktop bouquet, smaller — the same
+       * shape, the same proportions, just fitting the screen.
+       */
       const measure = () => {
         const w = pixi.screen.width;
         const h = pixi.screen.height;
+
+        if (h > w) {
+          // ---- Portrait: the desktop picture, scaled down ----
+          //
+          // The reference is the desktop layout at 1440x900. The bouquet is
+          // treated as one rigid block — dome, stems and kraft cone — and
+          // shrunk by a single factor, so the phone shows the same picture as
+          // the desktop, just smaller. Nothing here re-proportions the
+          // artwork: the dome keeps the desktop's aspect ratio, the cone
+          // keeps the desktop's taper, and the whole block stays anchored the
+          // same way to the bottom of the frame.
+          const REF_DOME_W = 990; // domeWidth at 1440x900
+          const REF_DOME_H = 504; // domeHeight at 1440x900
+          const REF_BLOOM_TOP = 82; // top of the blooms, measured
+          const REF_DOME_CY = 360; // dome centre y at 1440x900
+          const REF_TIE_Y = 738; // tie point y at 1440x900
+          const REF_BOTTOM = 898; // bottom of the cone, measured
+          const REF_GREENERY_X0 = 0.27; // GREENERY[].x minimum
+          const REF_GREENERY_X1 = 0.73; // GREENERY[].x maximum
+          const REF_WRAP_HALF_W = 288; // wrap maxWidth at 1440x900 (w * 0.2)
+
+          // The greenery fans wider than the blooms do, so it is what sets
+          // the width limit. It must stay clear of the screen edges.
+          const scaleByWidth = (w * 0.82) / ((REF_GREENERY_X1 - REF_GREENERY_X0) * REF_DOME_W);
+
+          // On the desktop the visible kraft cone below the tie is 18% of the
+          // screen height (the tie sits at 82%, and the cone runs off the
+          // bottom edge). The phone keeps that proportion exactly: the cone
+          // is cut off by the bottom of the viewport, just like the desktop.
+          const visibleCone = h * 0.18;
+
+          // The block is anchored to the bottom of the screen, so everything
+          // above the tie is measured back up by the scaled reference
+          // distances. The topmost bloom has to clear the title, which claims
+          // more room on a phone (two script lines) than on the desktop, so
+          // the scale is capped to fit the space that is left.
+          const titleBottom = h * 0.19;
+          const minGap = h * 0.035;
+
+          // Visible block height = (tie - bloomTop) + visibleCone
+          //   = (REF_TIE_Y - REF_BLOOM_TOP) * s + 0.18 * h
+          const scaleByHeight = (h - titleBottom - minGap - visibleCone) / (REF_TIE_Y - REF_BLOOM_TOP);
+          const s = Math.min(scaleByWidth, scaleByHeight, 1.15);
+
+          const domeWidth = REF_DOME_W * s;
+          const domeHeight = REF_DOME_H * s;
+
+          // The kraft cone keeps the desktop's proportions: its radius comes
+          // from `u` (86 * u, the same formula the desktop uses) and its
+          // length is the scaled reference length, so it reads as the same
+          // short, squat cone rather than a stretched spike.
+          const coneLength = (REF_BOTTOM - REF_TIE_Y) * s;
+
+          // Anchor to the bottom: the tie sits where the desktop puts it
+          // relative to the frame, and the cone runs off the lower edge.
+          const tieY = h - visibleCone;
+          const wrapBottomY = tieY + coneLength;
+          const domeCenterY = tieY - (REF_TIE_Y - REF_DOME_CY) * s;
+
+          return {
+            w,
+            h,
+            // Flower size follows the same uniform scale, so the blooms keep
+            // their proportion to the bouquet instead of shrinking twice.
+            u: clamp(s * 1.15, 0.62, 1.15),
+            tieX: w * 0.5,
+            tieY,
+            domeWidth,
+            domeCenterY,
+            domeHeight,
+            wrapBottomY,
+            wrapMaxWidth: REF_WRAP_HALF_W * s,
+          };
+        }
+
+        // ---- Landscape: the original layout, unchanged ----
         const u = clamp(Math.min(w / 860, h / 720), 0.5, 1.15);
 
         return {
@@ -286,6 +375,8 @@ export default function LilyBouquet() {
           // compact, round bouquet instead of a stretched column.
           domeCenterY: h * 0.4,
           domeHeight: Math.min(h * 0.56, w * 1.15),
+          wrapBottomY: h * 1.05,
+          wrapMaxWidth: w * 0.2,
         };
       };
 
@@ -361,8 +452,8 @@ export default function LilyBouquet() {
           tieX: m.tieX,
           tieY: m.tieY,
           scale: m.u,
-          bottomY: m.h * 1.05,
-          maxWidth: m.w * 0.2,
+          bottomY: m.wrapBottomY,
+          maxWidth: m.wrapMaxWidth,
         }, true);
       };
 
@@ -436,8 +527,8 @@ export default function LilyBouquet() {
           tieX: m.tieX,
           tieY: m.tieY,
           scale: m.u,
-          bottomY: m.h * 1.05,
-          maxWidth: m.w * 0.2,
+          bottomY: m.wrapBottomY,
+          maxWidth: m.wrapMaxWidth,
         });
       };
 
